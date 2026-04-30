@@ -39,6 +39,7 @@ We reformulate editing as a <b>Physical State Transition</b>, leveraging continu
 
 ## 🔥 News
 
+- **[2026/4/30]** — Our paper is accepted by ICML 2026!
 - **[2026/2/26]** — Release [paper](https://arxiv.org/abs/2602.21778).
 - **[2026/2/25]** — Release PhysicTran38K dataset, model checkpoints, as well as the training and inference code.
 
