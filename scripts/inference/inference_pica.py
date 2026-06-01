@@ -226,7 +226,7 @@ def main():
     print("Loading Qwen-Image-Edit-2509 pipeline...")
     pipe = QwenImagePhysicPipeline.from_pretrained(
         torch_dtype=torch.bfloat16,
-        device="cuda",
+        device="cuda:0",
         model_configs=[
             ModelConfig(model_id="Qwen/Qwen-Image-Edit-2509", origin_file_pattern="transformer/diffusion_pytorch_model*.safetensors", local_model_path=args.base_model_path),
             ModelConfig(model_id="Qwen/Qwen-Image", origin_file_pattern="text_encoder/model*.safetensors", local_model_path=args.base_model_path),
