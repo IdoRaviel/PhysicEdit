@@ -240,8 +240,9 @@ def main():
     print("Loading finetuned LoRA + new modules into pipeline...")
     load_finetuned_into_pipe(pipe, args.lora_path)
 
-    # Enable VRAM management
-    pipe.enable_vram_management()
+    # VRAM management offloads weights to CPU between calls. On H200 (141GB)
+    # the full pipeline fits in VRAM directly, so we skip it — both to avoid
+    # CPU-memory OOM and to speed up inference (no host-device transfers).
     
     out_root = Path(args.output_path).resolve()  # treat as DIR
     out_root.mkdir(parents=True, exist_ok=True)
