@@ -209,10 +209,14 @@ def main():
     parser.add_argument("--num_inference_steps", type=int, default=40, 
                        help="Number of inference steps")
     parser.add_argument("--start_idx", type=int, default=0,
-                       help="Start index of samples to process (inclusive)")
+                       help="Start index into the (filtered) sample list, inclusive.")
     parser.add_argument("--end_idx", type=int, default=900,
-                       help="End index of samples to process (exclusive)")
+                       help="End index into the (filtered) sample list, exclusive.")
     parser.add_argument("--prompt_type", type=str, default="intermediate", choices=["intermediate", "explicit", "superficial"],help="Type of prompt to use")
+    parser.add_argument("--physics_category", type=str, default=None,
+                       help="Filter to one physics_category (e.g. 'Optics'). Default: no filter.")
+    parser.add_argument("--physics_law", type=str, default=None,
+                       help="Comma-separated physics_law names (e.g. 'Reflection,Refraction'). Combined with --physics_category.")
     args = parser.parse_args()
 
     # load picabench
@@ -242,29 +246,31 @@ def main():
     out_root = Path(args.output_path).resolve()  # treat as DIR
     out_root.mkdir(parents=True, exist_ok=True)
     
-    # Determine processing range
-    total_samples = len(picabench["picabench"])
-    if args.start_idx is None:
-        start_idx = 0
-    else:
-        start_idx = args.start_idx
-    
-    if args.end_idx is None:
-        end_idx = total_samples
-    else:
-        end_idx = min(args.end_idx, total_samples)
-    
-    print(f"Total samples: {total_samples}, Processing samples {start_idx} to {end_idx-1}")
-    
-    # Create progress bar
-    pbar = tqdm(
-        range(start_idx, end_idx),
-        desc="Processing",
-        total=end_idx - start_idx,
-    )
+    ds = picabench["picabench"]
+    total_samples = len(ds)
+
+    # Build the list of HuggingFace indices to process, applying filters first.
+    all_indices = list(range(total_samples))
+    if args.physics_category is not None:
+        categories = ds["physics_category"]
+        all_indices = [i for i in all_indices if categories[i] == args.physics_category]
+    if args.physics_law is not None:
+        wanted_laws = set(args.physics_law.split(","))
+        laws = ds["physics_law"]
+        all_indices = [i for i in all_indices if laws[i] in wanted_laws]
+
+    start_idx = args.start_idx if args.start_idx is not None else 0
+    end_idx = min(args.end_idx if args.end_idx is not None else len(all_indices), len(all_indices))
+    indices_to_process = all_indices[start_idx:end_idx]
+
+    print(f"Total samples in dataset: {total_samples}")
+    print(f"After filters (category={args.physics_category}, law={args.physics_law}): {len(all_indices)} matched")
+    print(f"Processing slice [{start_idx}:{end_idx}] -> {len(indices_to_process)} samples")
+
+    pbar = tqdm(indices_to_process, desc="Processing", total=len(indices_to_process))
 
     for idx in pbar:
-        rec = picabench["picabench"][idx]
+        rec = ds[idx]
         superficial_prompt = rec["superficial_prompt"]
         intermediate_prompt = rec["intermediate_prompt"]
         explicit_prompt = rec["explicit_prompt"]
