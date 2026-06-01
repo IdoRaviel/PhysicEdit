@@ -23,7 +23,6 @@ from datasets import load_dataset
 from typing import List, Dict, Any
 from tqdm import tqdm
 import math
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 EDIT_SYSTEM_PROMPT = '''
@@ -87,6 +86,7 @@ Please strictly follow the rewriting rules below:
 '''
 
 def polish_edit_prompt(edit_prompt: str) -> str:
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     prompt = f"User Input: {edit_prompt} \n\n Rewritten Prompt:"
     success = False
     while not success:
