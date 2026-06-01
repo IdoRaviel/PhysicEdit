@@ -22,7 +22,7 @@ from ..vram_management import gradient_checkpoint_forward, enable_vram_managemen
 import torch.nn as nn
 from .helpers import PerceiverResampler, PhysicalTransitionAdapter, VisualThinkingAdapter, VisualThinkingDualAdapter, vt_get_alpha, VisualThinkingAdaLNAdapter
 
-from .dinov2 import Dinov2withNorm
+from .ijepa import IJepaEncoder
 from torchvision import transforms
 
 SPECIAL_TOKEN_NUM = 64
@@ -182,7 +182,7 @@ class QwenImageBlockwiseMultiControlNet(torch.nn.Module):
 
 class QwenImagePhysicPipeline(BasePipeline):
 
-    def __init__(self, device="cuda", torch_dtype=torch.bfloat16, dinov2_path=None, enable_vt_supervision: bool = True):
+    def __init__(self, device="cuda", torch_dtype=torch.bfloat16, ijepa_path=None, enable_vt_supervision: bool = True):
         super().__init__(
             device=device, torch_dtype=torch_dtype,
             height_division_factor=16, width_division_factor=16,
@@ -198,22 +198,24 @@ class QwenImagePhysicPipeline(BasePipeline):
 
         # Visual-thinking supervision branch (teacher targets for training loss).
         if self.enable_vt_supervision:
-            assert dinov2_path is not None, "dinov2_path must be provided when enable_vt_supervision=True"
-            self.dinov2 = Dinov2withNorm(dinov2_path=dinov2_path)
-            self.dinov2.to(device=device, dtype=torch_dtype)
+            assert ijepa_path is not None, "ijepa_path must be provided when enable_vt_supervision=True"
+            self.ijepa_encoder = IJepaEncoder(ijepa_path=ijepa_path)
+            self.ijepa_encoder.to(device=device, dtype=torch_dtype)
+            self.ijepa_proj = nn.Linear(1280, 768, bias=False)
+            self.ijepa_proj.to(device=device, dtype=torch_dtype)
             proc_image_mean = [0.485, 0.456, 0.406]
             proc_image_std = [0.229, 0.224, 0.225]
-            self.dinov2_mean = torch.tensor(proc_image_mean).view(1, 3, 1, 1)
-            self.dinov2_std = torch.tensor(proc_image_std).view(1, 3, 1, 1)
+            self.ijepa_mean = torch.tensor(proc_image_mean).view(1, 3, 1, 1)
+            self.ijepa_std = torch.tensor(proc_image_std).view(1, 3, 1, 1)
 
-            self.dino_resampler = PerceiverResampler(dim=768, num_latents=SPECIAL_TOKEN_NUM, depth=2)
-            self.dino_resampler.to(device=device, dtype=torch_dtype)
-            self.dino_time_embed = nn.Embedding(6, 768)
-            self.dino_time_embed.to(device=device, dtype=torch_dtype)
+            self.ijepa_resampler = PerceiverResampler(dim=768, num_latents=SPECIAL_TOKEN_NUM, depth=2)
+            self.ijepa_resampler.to(device=device, dtype=torch_dtype)
+            self.ijepa_time_embed = nn.Embedding(6, 768)
+            self.ijepa_time_embed.to(device=device, dtype=torch_dtype)
 
-            self.dino_resampler_adapter = VisualThinkingAdapter(in_dim=768, out_dim=3584)
-            self.dino_resampler_adapter.to(device=device, dtype=torch_dtype)
-            self.dino_input_size = 224
+            self.ijepa_resampler_adapter = VisualThinkingAdapter(in_dim=768, out_dim=3584)
+            self.ijepa_resampler_adapter.to(device=device, dtype=torch_dtype)
+            self.ijepa_input_size = 224
 
             self.vae_resampler = PerceiverResampler(dim=64, num_latents=SPECIAL_TOKEN_NUM, depth=2, max_num_media_tokens=10240)
             self.vae_resampler.to(device=device, dtype=torch_dtype)
@@ -222,13 +224,14 @@ class QwenImagePhysicPipeline(BasePipeline):
             self.vae_resampler_adapter = VisualThinkingAdapter(in_dim=64, out_dim=3584)
             self.vae_resampler_adapter.to(device=device, dtype=torch_dtype)
         else:
-            self.dinov2 = None
-            self.dinov2_mean = None
-            self.dinov2_std = None
-            self.dino_resampler = None
-            self.dino_time_embed = None
-            self.dino_resampler_adapter = None
-            self.dino_input_size = None
+            self.ijepa_encoder = None
+            self.ijepa_proj = None
+            self.ijepa_mean = None
+            self.ijepa_std = None
+            self.ijepa_resampler = None
+            self.ijepa_time_embed = None
+            self.ijepa_resampler_adapter = None
+            self.ijepa_input_size = None
             self.vae_resampler = None
             self.vae_time_embed = None
             self.vae_resampler_adapter = None
@@ -514,7 +517,7 @@ class QwenImagePhysicPipeline(BasePipeline):
         model_configs: list[ModelConfig] = [],
         tokenizer_config: ModelConfig = ModelConfig(model_id="Qwen/Qwen-Image", origin_file_pattern="tokenizer/"),
         processor_config: ModelConfig = None,
-        dinov2_path: str = None,
+        ijepa_path: str = None,
         enable_vt_supervision: bool = True,
     ):
         # Download and load models
@@ -526,12 +529,12 @@ class QwenImagePhysicPipeline(BasePipeline):
                 device=model_config.offload_device or device,
                 torch_dtype=model_config.offload_dtype or torch_dtype
             )
-        
+
         # Initialize pipeline
         pipe = QwenImagePhysicPipeline(
             device=device,
             torch_dtype=torch_dtype,
-            dinov2_path=dinov2_path,
+            ijepa_path=ijepa_path,
             enable_vt_supervision=enable_vt_supervision,
         )
         pipe.text_encoder = model_manager.fetch_model("qwen_image_text_encoder")
@@ -1014,8 +1017,9 @@ class QwenImageUnit_PhysicalVisualEmbedder(PipelineUnit):
             input_params=("middle_key_frames", "edit_image", "tiled", "tile_size", "tile_stride"),
             onload_model_names=(
                 "text_encoder",
-                "dino_resampler",
-                "dino_resampler_adapter",
+                "ijepa_proj",
+                "ijepa_resampler",
+                "ijepa_resampler_adapter",
                 "vae_resampler",
                 "vae_resampler_adapter",
             )
@@ -1058,18 +1062,18 @@ class QwenImageUnit_PhysicalVisualEmbedder(PipelineUnit):
         
         return split_hidden_states
     
-    def dino_input_preprocess(self, pipe, middle_key_frames, dino_input_size):
-        first_crop_size = int(dino_input_size * 1.5)
+    def ijepa_input_preprocess(self, pipe, middle_key_frames, ijepa_input_size):
+        first_crop_size = int(ijepa_input_size * 1.5)
         transform = transforms.Compose(
             [
                 transforms.Resize(first_crop_size, interpolation=transforms.InterpolationMode.BICUBIC),
-                transforms.RandomCrop(dino_input_size),
+                transforms.RandomCrop(ijepa_input_size),
                 transforms.ToTensor(),
             ]
         )
         middle_key_frames = [transform(image) for image in middle_key_frames]
         middle_tensor = torch.stack(middle_key_frames).to(pipe.device)
-        middle_tensor = (middle_tensor - pipe.dinov2_mean.to(pipe.device)) / pipe.dinov2_std.to(pipe.device)
+        middle_tensor = (middle_tensor - pipe.ijepa_mean.to(pipe.device)) / pipe.ijepa_std.to(pipe.device)
         return middle_tensor
 
 
@@ -1084,27 +1088,27 @@ class QwenImageUnit_PhysicalVisualEmbedder(PipelineUnit):
             encoder_attention_mask_middle = torch.stack([torch.cat([u, u.new_zeros(max_seq_len - u.size(0))]) for u in attn_mask_list_middle])
             middle_frame_embeds = middle_frame_embeds.to(dtype=pipe.torch_dtype, device=pipe.device)
 
-            # DINO + VAE dual visual embedder 
-            ###### First calculate dino feature
-            dino_inputs = self.dino_input_preprocess(pipe, middle_key_frames, pipe.dino_input_size)
-            dino_hidden_states = pipe.dinov2(dino_inputs)
+            # I-JEPA + VAE dual visual embedder
+            ###### First calculate I-JEPA feature
+            ijepa_inputs = self.ijepa_input_preprocess(pipe, middle_key_frames, pipe.ijepa_input_size)
+            ijepa_hidden_states = pipe.ijepa_proj(pipe.ijepa_encoder(ijepa_inputs))
 
-            # middle frame dino feature
-            time_emb = pipe.dino_time_embed(torch.arange(len(middle_key_frames), device=dino_hidden_states.device))
-            dino_middle_states = dino_hidden_states + time_emb.unsqueeze(1)
-            dino_middle_states = rearrange(dino_middle_states, "B L H -> 1 (B L) H")
-            dino_middle_resampler = pipe.dino_resampler(dino_middle_states)
-            dino_middle_adapter = pipe.dino_resampler_adapter(dino_middle_resampler)
+            # middle frame I-JEPA feature
+            time_emb = pipe.ijepa_time_embed(torch.arange(len(middle_key_frames), device=ijepa_hidden_states.device))
+            ijepa_middle_states = ijepa_hidden_states + time_emb.unsqueeze(1)
+            ijepa_middle_states = rearrange(ijepa_middle_states, "B L H -> 1 (B L) H")
+            ijepa_middle_resampler = pipe.ijepa_resampler(ijepa_middle_states)
+            ijepa_middle_adapter = pipe.ijepa_resampler_adapter(ijepa_middle_resampler)
 
-            # source image dino feature
-            source_image_dino_inputs = self.dino_input_preprocess(pipe, [edit_image], pipe.dino_input_size)
-            source_image_dino_hidden_states = pipe.dinov2(source_image_dino_inputs)
-            source_image_dino_hidden_states = rearrange(source_image_dino_hidden_states, "B L H -> 1 (B L) H")
-            source_image_dino_resampler = pipe.dino_resampler(source_image_dino_hidden_states)
-            source_image_dino_adapter = pipe.dino_resampler_adapter(source_image_dino_resampler)
+            # source image I-JEPA feature
+            source_image_ijepa_inputs = self.ijepa_input_preprocess(pipe, [edit_image], pipe.ijepa_input_size)
+            source_image_ijepa_hidden_states = pipe.ijepa_proj(pipe.ijepa_encoder(source_image_ijepa_inputs))
+            source_image_ijepa_hidden_states = rearrange(source_image_ijepa_hidden_states, "B L H -> 1 (B L) H")
+            source_image_ijepa_resampler = pipe.ijepa_resampler(source_image_ijepa_hidden_states)
+            source_image_ijepa_adapter = pipe.ijepa_resampler_adapter(source_image_ijepa_resampler)
 
-            # delta dino embedding
-            pseudo_special_emb_dino = dino_middle_adapter - source_image_dino_adapter
+            # delta I-JEPA embedding
+            pseudo_special_emb_ijepa = ijepa_middle_adapter - source_image_ijepa_adapter
 
             ###### Second calculate vae feature 
             processed_middle_frames = [pipe.preprocess_image(image).to(pipe.device, pipe.torch_dtype) for image in middle_key_frames]
@@ -1134,7 +1138,7 @@ class QwenImageUnit_PhysicalVisualEmbedder(PipelineUnit):
 
             pseudo_special_emb_vae = vae_middle_emb - vae_source_emb
 
-            return {"pseudo_special_emb_dino": pseudo_special_emb_dino, "pseudo_special_emb_vae": pseudo_special_emb_vae}
+            return {"pseudo_special_emb_ijepa": pseudo_special_emb_ijepa, "pseudo_special_emb_vae": pseudo_special_emb_vae}
         else:
             return {}
 
@@ -1343,7 +1347,7 @@ def model_fn_qwen_image(
     use_gradient_checkpointing_offload=False,
     edit_rope_interpolation=False,
     is_train=True,
-    pseudo_special_emb_dino=None,
+    pseudo_special_emb_ijepa=None,
     pseudo_special_emb_vae=None,
     **kwargs
 ):
@@ -1351,10 +1355,10 @@ def model_fn_qwen_image(
     special_token_loss = 0
     if special_token_mask is not None:
         special_token = prompt_emb[special_token_mask].view(prompt_emb.shape[0], -1, prompt_emb.size(-1))
-        special_token, dino_pred, vae_pred = visual_thinking_adapter(special_token, timestep)
+        special_token, ijepa_pred, vae_pred = visual_thinking_adapter(special_token, timestep)
         prompt_emb[special_token_mask] = special_token
         if is_train:
-            special_token_loss = visual_thinking_adapter.get_loss(dino_pred, vae_pred, pseudo_special_emb_dino, pseudo_special_emb_vae, timestep)
+            special_token_loss = visual_thinking_adapter.get_loss(ijepa_pred, vae_pred, pseudo_special_emb_ijepa, pseudo_special_emb_vae, timestep)
 
     img_shapes = [(latents.shape[0], latents.shape[2]//2, latents.shape[3]//2)]
     txt_seq_lens = prompt_emb_mask.sum(dim=1).tolist()

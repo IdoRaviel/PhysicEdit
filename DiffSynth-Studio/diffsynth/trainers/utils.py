@@ -1111,5 +1111,5 @@ def qwen_image_parser():
     parser.add_argument("--resume_type", type=str, choices=["auto", "full", "model"], default="auto", help="auto: auto select by path type; full: resume from Accelerate state directory; model: only load model weight")
     parser.add_argument("--resume_original_num_processes", type=int, default=4, help="resume original number of processes, used for calculating the number of processes when metadata is missing.")
     parser.add_argument("--local_model_path", type=str, default=None, help="Local directory containing the model files (avoids downloading from HuggingFace).")
-    parser.add_argument("--dinov2_path", type=str, default=None, required=True, help="Path to the local DINOv2-with-registers-base model directory.")
+    parser.add_argument("--ijepa_path", type=str, default=None, required=True, help="Path to the local I-JEPA ViT-H/14 checkpoint (.pth.tar from fbaipublicfiles).")
     return parser

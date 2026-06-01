@@ -203,14 +203,14 @@ class QwenImageTrainingModule(DiffusionTrainingModule):
         wandb_project=None,
         wandb_run_name=None,
         local_model_path=None,
-        dinov2_path=None,
+        ijepa_path=None,
     ):
         super().__init__()
         # Load models
         model_configs = self.parse_model_configs(model_paths, model_id_with_origin_paths, enable_fp8_training=enable_fp8_training, local_model_path=local_model_path, skip_download=local_model_path is not None)
         tokenizer_config = ModelConfig(model_id="Qwen/Qwen-Image", origin_file_pattern="tokenizer/", local_model_path=local_model_path, skip_download=local_model_path is not None) if tokenizer_path is None else ModelConfig(tokenizer_path)
         processor_config = ModelConfig(model_id="Qwen/Qwen-Image-Edit", origin_file_pattern="processor/", local_model_path=local_model_path, skip_download=local_model_path is not None) if processor_path is None else ModelConfig(processor_path)
-        self.pipe = QwenImagePhysicPipeline.from_pretrained(torch_dtype=torch.bfloat16, device="cpu", model_configs=model_configs, tokenizer_config=tokenizer_config, processor_config=processor_config, dinov2_path=dinov2_path)
+        self.pipe = QwenImagePhysicPipeline.from_pretrained(torch_dtype=torch.bfloat16, device="cpu", model_configs=model_configs, tokenizer_config=tokenizer_config, processor_config=processor_config, ijepa_path=ijepa_path)
 
         # Training mode
         self.switch_pipe_to_training_mode(
@@ -436,7 +436,7 @@ if __name__ == "__main__":
         wandb_project=args.wandb_project,
         wandb_run_name=args.wandb_run_name,
         local_model_path=args.local_model_path,
-        dinov2_path=args.dinov2_path,
+        ijepa_path=args.ijepa_path,
     )
     model_logger = WandbModelLogger(
         args.output_path,
@@ -464,11 +464,12 @@ if __name__ == "__main__":
         trainable_param_names = []
         perceiver_resampler_params = 0
         visual_thinking_adapter_params = 0
-        dino_resampler_params = 0
-        dino_resampler_adapter_params = 0
+        ijepa_proj_params = 0
+        ijepa_resampler_params = 0
+        ijepa_resampler_adapter_params = 0
         vae_resampler_params = 0
         vae_resampler_adapter_params = 0
-        dino_time_embed_params = 0
+        ijepa_time_embed_params = 0
         vae_time_embed_params = 0
         physical_transition_adapter_params = 0
         for name, param in model.named_parameters():
@@ -479,18 +480,20 @@ if __name__ == "__main__":
                     perceiver_resampler_params += param.numel()
                 if "visual_thinking_adapter" in name:
                     visual_thinking_adapter_params += param.numel()
-                if "dino_resampler" in name:
-                    if "dino_resampler_adapter" in name:
-                        dino_resampler_adapter_params += param.numel()
+                if "ijepa_proj" in name:
+                    ijepa_proj_params += param.numel()
+                if "ijepa_resampler" in name:
+                    if "ijepa_resampler_adapter" in name:
+                        ijepa_resampler_adapter_params += param.numel()
                     else:
-                        dino_resampler_params += param.numel()
+                        ijepa_resampler_params += param.numel()
                 if "vae_resampler" in name:
                     if "vae_resampler_adapter" in name:
                         vae_resampler_adapter_params += param.numel()
                     else:
                         vae_resampler_params += param.numel()
-                if "dino_time_embed" in name:
-                    dino_time_embed_params += param.numel()
+                if "ijepa_time_embed" in name:
+                    ijepa_time_embed_params += param.numel()
                 if "vae_time_embed" in name:
                     vae_time_embed_params += param.numel()
                 if "physical_transition_adapter" in name:
@@ -499,11 +502,12 @@ if __name__ == "__main__":
         print(f"Total Parameters: {sum(p.numel() for p in model.parameters()) / 1e6:.2f} Million")
         print(f"Perceiver Resampler Params: {perceiver_resampler_params / 1e6:.2f} Million")
         print(f"Visual Thinking Adapter Params: {visual_thinking_adapter_params / 1e6:.2f} Million")
-        print(f"DINO Resampler Params: {dino_resampler_params / 1e6:.2f} Million")
-        print(f"DINO Resampler Adapter Params: {dino_resampler_adapter_params / 1e6:.2f} Million")
+        print(f"I-JEPA Projection Params: {ijepa_proj_params / 1e6:.2f} Million")
+        print(f"I-JEPA Resampler Params: {ijepa_resampler_params / 1e6:.2f} Million")
+        print(f"I-JEPA Resampler Adapter Params: {ijepa_resampler_adapter_params / 1e6:.2f} Million")
         print(f"VAE Resampler Params: {vae_resampler_params / 1e6:.2f} Million")
         print(f"VAE Resampler Adapter Params: {vae_resampler_adapter_params / 1e6:.2f} Million")
-        print(f"DINO Time Embed Params: {dino_time_embed_params} ")
+        print(f"I-JEPA Time Embed Params: {ijepa_time_embed_params} ")
         print(f"VAE Time Embed Params: {vae_time_embed_params} ")
         print(f"Physical Transition Adapter Params: {physical_transition_adapter_params/1e6:.2f} Million")
         print("="*50 + "\n")
