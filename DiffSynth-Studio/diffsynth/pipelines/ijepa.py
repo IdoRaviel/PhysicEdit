@@ -146,6 +146,8 @@ class IJepaEncoder(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # (B, 3, 224, 224) -> (B, 256, 1280); no CLS to strip.
+        # Cast input to encoder dtype (preprocessing produces float32; encoder weights are bfloat16).
+        x = x.to(self.encoder.patch_embed.proj.weight.dtype)
         return self.encoder(x)
 
 
