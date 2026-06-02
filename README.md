@@ -7,6 +7,25 @@ All credit for the base model, architecture, and training framework belongs to t
 
 ---
 
+## About PhysicEdit
+
+Standard image editing models learn to map input images to outputs that look semantically correct, but they routinely violate physical laws — reflections that don't match geometry, lighting that ignores surface normals, shadows in the wrong direction. PhysicEdit addresses this by reformulating editing as a **physical state transition**: instead of learning a direct image-to-image mapping, the model leverages continuous dynamics to steer generation along physically plausible trajectories. It is trained on PhysicTran38K, a video-derived dataset where consecutive frames naturally encode physical transitions across five domains: Optics, Mechanics, Fluid, Thermal, and State Transition.
+
+---
+
+## Example: Inference on a Personal Photo
+
+Running the full PhysicEdit model on a personal photo. The model edits the lighting of a balcony scene to simulate direct overhead sunlight — a Light Source Effects edit.
+
+| Input | Output |
+|---|---|
+| ![Input](images/img1.jpeg) | ![Output](images/img1_output_seed42.jpg) |
+
+> Prompt: "The sun is directly overhead the balcony, casting bright uniform sunlight across the entire floor"  
+> Model: PhysicEdit (full model) · Steps: 40 · Seed: 42
+
+---
+
 ## Research Goal
 
 The original PhysicEdit trains on all five physical domains (Optics, Mechanics, State Transition, etc.). We investigate two focused questions on the **Optics** domain:
