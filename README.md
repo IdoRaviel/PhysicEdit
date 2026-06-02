@@ -70,6 +70,16 @@ Raw result files: `results/optics_dino/` and `results/optics_ijepa/`.
 - Added trainable linear projection 1280→768 to match downstream dimension
 - Same Optics-only training data as Exp 1
 
+### Modified Files
+
+| File | Branch | Change |
+|---|---|---|
+| `scripts/inference/inference_pica.py` | both | Added `--physics_category` / `--physics_law` filters; fixed device to `cuda:0`; removed `enable_vram_management()` |
+| `DiffSynth-Studio/diffsynth/pipelines/ijepa.py` | `ijepa-switch` | New file — vendored I-JEPA ViT-H/14 encoder (no CLS token, sin-cos positional embedding) |
+| `DiffSynth-Studio/diffsynth/pipelines/qwen_image_physical.py` | `ijepa-switch` | Replaced DINOv2 with `IJepaEncoder` + trainable `ijepa_proj` linear layer (1280→768) |
+| `DiffSynth-Studio/diffsynth/trainers/utils.py` | `ijepa-switch` | Renamed `--dinov2_path` argument to `--ijepa_path` |
+| `scripts/train/train_physicedit.py` | `ijepa-switch` | Updated to pass `ijepa_path` and register I-JEPA modules as trainable |
+
 ---
 
 ## Evaluation
