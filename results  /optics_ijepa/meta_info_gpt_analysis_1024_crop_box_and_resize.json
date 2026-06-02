@@ -1,0 +1,61 @@
+{
+  "overall_accuracy": 56.09033028253085,
+  "sample_count": 359,
+  "qa_total": 1605,
+  "by_category": {
+    "Optics": {
+      "accuracy": 56.09033028253085,
+      "sample_count": 359,
+      "qa_total": 1605
+    }
+  },
+  "by_law": {
+    "Refraction": {
+      "accuracy": 43.17160826594788,
+      "sample_count": 53,
+      "qa_total": 228
+    },
+    "Light_Propagation": {
+      "accuracy": 54.11564625850342,
+      "sample_count": 91,
+      "qa_total": 413
+    },
+    "Reflection": {
+      "accuracy": 55.7967032967033,
+      "sample_count": 130,
+      "qa_total": 593
+    },
+    "Light_Source_Effects": {
+      "accuracy": 66.70868347338934,
+      "sample_count": 85,
+      "qa_total": 371
+    }
+  },
+  "by_operation": {
+    "remove": {
+      "accuracy": 42.85177228786251,
+      "sample_count": 133,
+      "qa_total": 563
+    },
+    "move": {
+      "accuracy": 55.311244979919685,
+      "sample_count": 83,
+      "qa_total": 404
+    },
+    "add": {
+      "accuracy": 70.4375,
+      "sample_count": 80,
+      "qa_total": 347
+    },
+    "replace": {
+      "accuracy": 66.74277907884463,
+      "sample_count": 61,
+      "qa_total": 281
+    },
+    "color": {
+      "accuracy": 70.0,
+      "sample_count": 2,
+      "qa_total": 10
+    }
+  }
+}
