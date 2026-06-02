@@ -174,7 +174,6 @@ cython_debug/
 # Data and logs
 PhysicTran38K/
 models/
-images/
 *.out
 *.err
 outputs/
