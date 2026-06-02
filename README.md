@@ -82,6 +82,23 @@ Raw result files: `results/optics_dino/` and `results/optics_ijepa/`.
 
 ---
 
+## Training
+
+Both experiments fine-tune the base [Qwen-Image-Edit-2509](https://huggingface.co/Qwen/Qwen-Image-Edit-2509) model using LoRA, following the exact hyperparameters from the original paper.
+
+**Dataset**: PhysicTran38K — Optics subset only (`Optical_State`, 6,244 samples across 8 scene categories). The original paper trains on all five domains (~38K samples total).
+
+**Configuration** (identical to the paper):
+- LoRA rank: 128
+- Learning rate: 1e-5
+- Epochs: 1
+- Trainable modules: LoRA layers + `visual_thinking_adapter` + VAE resampler/time-embed
+- Exp 2 additionally trains: `ijepa_proj` + I-JEPA resampler/time-embed
+
+**Hardware**: BIU HPC, single H200 GPU (141GB VRAM). Training time ~2.5h per experiment.
+
+---
+
 ## Evaluation
 
 Inference on [PICABench](https://huggingface.co/datasets/Andrew613/PICABench) optical subcategories:
@@ -117,12 +134,6 @@ python PicaEval_gpt.py \
   --gpt_model gpt-4o \
   --num_workers 4
 ```
-
----
-
-## Hardware
-
-Training and inference ran on BIU HPC (H200 GPU, 141GB VRAM). Training: ~2.5h per experiment. Inference: ~41s/sample.
 
 ---
 
