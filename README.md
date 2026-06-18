@@ -17,11 +17,8 @@ Standard image editing models learn to map input images to outputs that look sem
 
 Running the full PhysicEdit model on a personal photo. The model edits the lighting of a balcony scene to simulate direct overhead sunlight — a Light Source Effects edit.
 
-| Input | Output |
-|---|---|
-| ![Input](images/img1.jpeg) | ![Output](images/img1_output_seed42.jpg) |
+![Before / After](images/before_after.jpg)
 
-> Prompt: "The sun is directly overhead the balcony, casting bright uniform sunlight across the entire floor"  
 > Model: PhysicEdit (full model) · Steps: 40 · Seed: 42
 
 ---
